@@ -172,6 +172,18 @@ export default function TonWallet() {
         if (strictSwapRuntime.status !== 'ready' || !activeAccount) {
             throw new Error('Secure runtime not available');
         }
+        const senderAddress = walletAddress || activeAccount.address;
+        if (!senderAddress) {
+            throw new Error('Wallet address is unavailable');
+        }
+        const trimmedRecipient = recipient.trim();
+        const resolvedRecipient = trimmedRecipient.toLowerCase().endsWith('.ton')
+            ? (await walletServiceRef.current.resolveAddress(
+                walletServiceRef.current.getClient(network === 'testnet'),
+                trimmedRecipient,
+            )).toString({ bounceable: false, testOnly: network === 'testnet', urlSafe: true })
+            : trimmedRecipient;
+
         const executor = new TransferExecutor({
             network,
             decryptor: {
@@ -183,25 +195,27 @@ export default function TonWallet() {
             signerClock: () => Math.floor(Date.now() / 1000),
         });
 
+        const walletDesc = walletDescriptorForAccountType(
+            (walletType || activeAccount.type) as WalletContractVersion,
+            senderAddress,
+        );
+
         await executor.send({
             kind: 'nft',
             network,
             nftAddress: item.address,
-            recipient,
-            responseDestination: activeAccount.address,
+            recipient: resolvedRecipient,
+            responseDestination: senderAddress,
             forwardAmount: 50_000_000n,
             attachedTon: 70_000_000n,
             forwardPayload: comment || '',
             purpose: `Transfer NFT ${item.metadata?.name || 'NFT'}`,
         } as any, {
-            address: activeAccount.address,
-            wallet: walletDescriptorForAccountType(
-                activeAccount.type as WalletContractVersion,
-                activeAccount.address,
-            ),
+            address: senderAddress,
+            wallet: walletDesc,
             encryptedMnemonic: activeAccount.encryptedSeed as any,
-        } as any, password);
-    }, [activeAccount, getDecryptedSeed, network, strictSwapRuntime]);
+        }, password);
+    }, [activeAccount, getDecryptedSeed, network, strictSwapRuntime, walletAddress, walletType]);
 
     // Handle a validated TON Connect link from scan, upload, or paste
     const handleTonConnectLinkDecoded = useCallback((link: TonConnectLink) => {

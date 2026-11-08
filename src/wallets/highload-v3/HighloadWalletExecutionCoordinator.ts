@@ -116,7 +116,7 @@ export class HighloadWalletExecutionCoordinator implements WalletExecutionCoordi
         const replayProtection: HighloadReplayProtection = {
             kind: 'highload-query',
             queryId: queryIdObj.getQueryId(),
-            createdAtUnix: nowUnix,
+            createdAtUnix: Math.max(0, nowUnix - 30),
         };
 
         // ── 3–5. Derive key, sign, zero ────────────────────────────────────────

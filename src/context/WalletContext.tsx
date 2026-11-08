@@ -546,6 +546,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
             if (!activeAccount.address || activeAccount.address !== wallet.address) {
                 accountManager.updateAccount(activeAccount.id, { address: wallet.address });
                 setAccounts(accountManager.getAccounts());
+                setActiveAccount({ ...activeAccount, address: wallet.address });
             }
 
             setIsLoggedIn(true);

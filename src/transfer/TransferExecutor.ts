@@ -15,7 +15,7 @@ import type { NativeTonTransferIntent, JettonTransferIntent, TransferIntent } fr
 import type { NftTransferIntent } from '../nft/types';
 import { TransferConstructionError } from './errors';
 import type { NetworkId } from '../core/chain';
-import type { StandardWalletDescriptor } from '../wallet/types';
+import type { WalletDescriptor } from '../wallet/types';
 import type {
     PasswordConfirmedTransactionAccount,
     PasswordConfirmedTransactionResult,
@@ -33,7 +33,7 @@ import { PasswordConfirmedTransactionExecutor } from '../tonconnect/PasswordConf
  */
 export interface TransferAccount {
     readonly address: string;
-    readonly wallet: StandardWalletDescriptor;
+    readonly wallet: WalletDescriptor;
     readonly encryptedMnemonic: TonConnectEncryptedMnemonic;
 }
 
@@ -58,7 +58,7 @@ export class TransferExecutor {
             network: options.network,
             decryptor: options.decryptor,
             walletCoordinatorFactory: options.walletCoordinatorFactory,
-            signerClock: options.signerClock ?? (() => Date.now()),
+            signerClock: options.signerClock ?? (() => Math.floor(Date.now() / 1000)),
         });
     }
 
@@ -98,7 +98,7 @@ export class TransferExecutor {
                 wallet: account.wallet,
                 messages: [message],
                 validUntilUnix,
-                correlationId: `transfer:${uuidv4()}`,
+                correlationId: `transfer_${uuidv4()}`,
             },
             account: executorAccount,
             password,
@@ -155,7 +155,7 @@ export class TransferExecutor {
                 wallet: account.wallet,
                 messages,
                 validUntilUnix,
-                correlationId: `batch:${uuidv4()}`,
+                correlationId: `batch_${uuidv4()}`,
             },
             account: executorAccount,
             password,

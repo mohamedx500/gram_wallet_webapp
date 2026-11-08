@@ -174,6 +174,31 @@ export class PasswordConfirmedTransactionExecutor {
     }
 }
 
+function isCoherentWalletDescriptor(wallet: WalletDescriptor): boolean {
+    if (wallet.kind === 'standard') {
+        return (
+            (wallet.version === 'v3r1'
+                || wallet.version === 'v3r2'
+                || wallet.version === 'v4r2'
+                || wallet.version === 'v5r1')
+            && typeof wallet.address === 'string'
+            && wallet.address.length > 0
+        );
+    }
+    if (wallet.kind === 'highload-v3') {
+        return (
+            wallet.version === 'highload-v3'
+            && typeof wallet.address === 'string'
+            && wallet.address.length > 0
+            && Number.isSafeInteger(wallet.subwalletId)
+            && wallet.subwalletId > 0
+            && Number.isSafeInteger(wallet.timeoutSeconds)
+            && wallet.timeoutSeconds > 0
+        );
+    }
+    return false;
+}
+
 function assertRequestCoherence(
     request: ExecutePasswordConfirmedTransactionRequest,
     network: NetworkId,
@@ -183,8 +208,8 @@ function assertRequestCoherence(
         throw executionFailure('The approved TON Connect transaction belongs to a different TON network.');
     }
     if (
-        transaction.wallet.kind !== 'standard'
-        || account.wallet.kind !== 'standard'
+        !isCoherentWalletDescriptor(transaction.wallet)
+        || !isCoherentWalletDescriptor(account.wallet)
         || account.wallet !== transaction.wallet
         || !isSameAddress(account.address, transaction.wallet.address)
         || !isSameAddress(account.wallet.address, transaction.wallet.address)
@@ -257,9 +282,6 @@ function toSafeResult(
     result: WalletExecutionResult,
     request: WalletExecutionRequest,
 ): PasswordConfirmedTransactionResult {
-    if (request.wallet.kind !== 'standard') {
-        throw executionFailure('Highload Wallet V3 is not supported by this TON Connect transaction executor.');
-    }
     return Object.freeze({
         network: request.network,
         walletAddress: request.wallet.address,
