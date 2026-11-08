@@ -169,6 +169,14 @@ export class TonConnectWalletService {
         }
     }
 
+    /** Close all in-memory bridge transports without removing persisted sessions. */
+    public destroy(): void {
+        for (const transport of this.transports.values()) {
+            transport.destroy();
+        }
+        this.transports.clear();
+    }
+
     /** Fetch and validate the DApp manifest without creating a session. */
     public async previewConnectLink(link: TonConnectLink): Promise<TonConnectManifest> {
         return this.fetchManifest(link.request.manifestUrl);
@@ -191,14 +199,26 @@ export class TonConnectWalletService {
             await this.clearSession(accountId, link.appClientId, existing.walletClientId);
         }
 
+        const manifest = await this.fetchManifest(link.request.manifestUrl);
+
+        // Replace any previous session for the same account + dApp origin
+        for (const [oldWalletClientId, oldSession] of [...this.sessions.entries()]) {
+            if (oldSession.accountId === accountId && oldSession.manifestOrigin === manifest.origin) {
+                await this.clearSession(accountId, oldSession.appClientId, oldWalletClientId);
+            }
+        }
+        for (const storedSession of this.store.listForAccount(this.network, accountId)) {
+            if (storedSession.manifestOrigin === manifest.origin) {
+                await this.clearSession(accountId, storedSession.appClientId, storedSession.walletClientId);
+            }
+        }
+
         if (this.sessions.size >= this.maxSessions) {
             throw new TonConnectWalletError(
                 'INVALID_SESSION',
                 `Maximum ${this.maxSessions} simultaneous sessions are supported.`,
             );
         }
-
-        const manifest = await this.fetchManifest(link.request.manifestUrl);
         if (walletDescriptor.kind === 'standard') {
             assertStandardWalletAuthority(walletDescriptor, this.network, {
                 publicKey: walletPublicKey,
@@ -220,17 +240,18 @@ export class TonConnectWalletService {
         const proofItem = link.request.items.find((i) => i.name === 'ton_proof');
         let proofResult: Awaited<ReturnType<TonProofService['create']>> | undefined;
         if (proofItem && proofItem.name === 'ton_proof') {
+            const nowSec = Math.floor(Date.now() / 1000);
             const proofService = new TonProofService({
                 network: this.network,
-                clock: () => Math.floor(Date.now() / 1000),
+                clock: () => nowSec,
             });
             proofResult = await proofService.create(
                 {
                     network: this.network,
                     walletAddress: accountAddress,
-                    manifestUrl: link.request.manifestUrl,
+                    manifestUrl: manifest.url,
                     payload: proofItem.payload,
-                    timestamp: Math.floor(Date.now() / 1000),
+                    timestamp: nowSec,
                 },
                 proofAuthority,
             );
@@ -243,7 +264,7 @@ export class TonConnectWalletService {
             proofResult,
         );
 
-        const eventId = 0;
+        const eventId = 1;
         const responsePayload = JSON.stringify({
             event: 'connect',
             id: eventId,
@@ -268,7 +289,7 @@ export class TonConnectWalletService {
             bridgeUrl: this.bridgeUrl,
             createdAtMs: Date.now(),
             lastRequestId: null,
-            nextEventId: 0,
+            nextEventId: eventId + 1,
         });
 
         this.sessions.set(walletClientId, session);
@@ -399,8 +420,8 @@ export class TonConnectWalletService {
             request,
             manifest,
             from,
-            approve: async (txHash?: string) => {
-                await sendResponse({ boc: txHash ?? '' });
+            approve: async (boc?: string) => {
+                await sendResponse(boc ?? '');
                 // Persist updated lastRequestId
                 const updated: TonConnectStoredSession = Object.freeze({
                     ...session,

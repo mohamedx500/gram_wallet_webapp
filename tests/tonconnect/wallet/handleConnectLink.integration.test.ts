@@ -110,6 +110,7 @@ describe('handleConnectLink integration', () => {
 
         expect(sendSpy).toHaveBeenCalledOnce();
         expect(service.getSessions()).toHaveLength(1);
+        expect(service.getSessions()[0]?.nextEventId).toBe(2);
 
         keyPair.secretKey.fill(0);
     });

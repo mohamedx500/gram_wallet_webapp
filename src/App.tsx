@@ -30,7 +30,7 @@ import type { TonConnectLink, TonConnectManifest, TonConnectSessionDescriptor } 
 import { tonConnectErrorMessage } from './qr';
 import { PasswordConfirmedTransactionExecutor } from './tonconnect/PasswordConfirmedTransactionExecutor';
 import { TransferExecutor } from './transfer/TransferExecutor';
-import { Cell } from '@ton/core';
+import { Address, Cell } from '@ton/core';
 import { sign } from '@ton/crypto';
 
 export default function TonWallet() {
@@ -109,6 +109,9 @@ export default function TonWallet() {
         });
         tcServiceRef.current = svc;
         setConnectedSessions([]);
+        return () => {
+            svc.destroy();
+        };
     }, [network]);
 
     // Restore persisted TON Connect sessions for the active account
@@ -251,8 +254,6 @@ export default function TonWallet() {
             const resolvedAddress = imported.address;
             const keyPair = imported.keyPair;
             secretKey = keyPair.secretKey;
-
-            svc.clearSessionsForAccount(activeAccount.id);
 
             const walletDesc = walletDescriptorForAccountType(walletVersion, resolvedAddress);
 
@@ -714,40 +715,32 @@ export default function TonWallet() {
                             signerClock: () => Math.floor(Date.now() / 1000)
                         });
 
-                        const res = await executor.execute({
+                        const walletDesc = pending.session.walletDescriptor;
+                        const res = await executor.executeForTonConnect({
                             transaction: {
                                 network,
-                                wallet: pending.session.walletDescriptor,
+                                wallet: walletDesc,
                                 messages: msgs.map(msg => ({
                                     to: msg.address,
                                     value: BigInt(msg.amount),
-                                    bounce: true,
+                                    bounce: Address.isFriendly(msg.address)
+                                        ? Address.parseFriendly(msg.address).isBounceable
+                                        : true,
                                     purpose: 'TON Connect Transaction',
-                                    body: msg.payload ? Cell.fromBase64(msg.payload) : undefined
+                                    body: msg.payload ? Cell.fromBase64(msg.payload) : undefined,
                                 })),
                                 validUntilUnix: parsed.valid_until ?? (Math.floor(Date.now() / 1000) + 300),
                                 correlationId: crypto.randomUUID(),
                             },
                             account: {
                                 address: pending.session.accountAddress,
-                                wallet: activeAccount!.type === 'highload-v3' ? {
-                                    kind: 'highload-v3',
-                                    version: 'highload-v3',
-                                    address: activeAccount!.address,
-                                    subwalletId: 4269,
-                                    timeoutSeconds: 300,
-                                } : {
-                                    kind: 'standard',
-                                    version: activeAccount!.type as any,
-                                    address: activeAccount!.address,
-                                    subwalletId: 698983191,
-                                } as any,
+                                wallet: walletDesc,
                                 encryptedMnemonic: activeAccount!.encryptedSeed as any,
                             },
-                            password
+                            password,
                         });
 
-                        return res.txHash ?? undefined;
+                        return res.externalMessageBoc;
                     }}
                 />
             </div>

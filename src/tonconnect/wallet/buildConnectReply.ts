@@ -13,12 +13,16 @@ const TESTNET_GLOBAL_ID = -3;
 const DEFAULT_STANDARD_WALLET_ID = 698983191;
 const DEFAULT_V5_SUBWALLET_NUMBER = 0;
 
+export type TonConnectFeature =
+    | 'SendTransaction'
+    | Readonly<{ readonly name: 'SendTransaction'; readonly maxMessages: 4 }>;
+
 export interface TonConnectDeviceInfo {
     readonly platform: 'browser';
     readonly appName: string;
     readonly appVersion: string;
     readonly maxProtocolVersion: 2;
-    readonly features: readonly Readonly<{ readonly name: 'SendTransaction'; readonly maxMessages: 4 }>[];
+    readonly features: readonly TonConnectFeature[];
 }
 
 export interface TonConnectConnectPayload {
@@ -29,11 +33,12 @@ export interface TonConnectConnectPayload {
 export function buildTonConnectDeviceInfo(): TonConnectDeviceInfo {
     return Object.freeze({
         platform: 'browser',
-        appName: 'TON Wallet',
+        appName: 'tonkeeper',
         appVersion: '2.0.0',
         maxProtocolVersion: 2,
         features: Object.freeze([
-            Object.freeze({ name: 'SendTransaction', maxMessages: 4 as const }),
+            'SendTransaction' as const,
+            Object.freeze({ name: 'SendTransaction' as const, maxMessages: 4 as const }),
         ]),
     });
 }

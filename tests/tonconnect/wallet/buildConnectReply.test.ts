@@ -21,6 +21,11 @@ describe('buildTonConnectConnectPayload', () => {
         const payload = buildTonConnectConnectPayload(wallet, 'mainnet', keyPair.publicKey);
 
         expect(payload.device).toEqual(buildTonConnectDeviceInfo());
+        expect(payload.device.appName).toBe('tonkeeper');
+        expect(payload.device.features).toEqual([
+            'SendTransaction',
+            { name: 'SendTransaction', maxMessages: 4 },
+        ]);
         expect(payload.items).toHaveLength(1);
 
         const tonAddr = payload.items[0] as Record<string, string>;

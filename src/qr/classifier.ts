@@ -96,7 +96,11 @@ export function classifyScanResult(raw: string, network: NetworkId): ScanResult 
 
     const lowered = trimmed.toLowerCase();
 
-    if (lowered.startsWith('tc:')) {
+    if (
+        lowered.startsWith('tc:')
+        || lowered.startsWith('tonkeeper-tc:')
+        || lowered.startsWith('https://app.tonkeeper.com/ton-connect')
+    ) {
         return classifyTonConnectLink(trimmed);
     }
 
@@ -111,7 +115,10 @@ export function classifyScanResult(raw: string, network: NetworkId): ScanResult 
 
 function classifyTonConnectLink(raw: string): ScanResult {
     try {
-        const link = decodeTonConnectLink(raw, { acceptedSchemes: ['tc:'] });
+        const link = decodeTonConnectLink(raw, {
+            acceptedSchemes: ['tc:', 'tonkeeper-tc:'],
+            acceptedHttpsHosts: ['app.tonkeeper.com'],
+        });
         return Object.freeze({ kind: 'TON_CONNECT_LINK', link });
     } catch {
         return UNSUPPORTED;
